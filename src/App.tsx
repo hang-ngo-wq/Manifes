@@ -46,7 +46,7 @@ export default function App() {
   }, [manifests]);
 
   // Selected Shipper for interactive detailed billing report (Hình 2 visualization)
-  const [selectedShipper, setSelectedShipper] = useState<string>("DYM VIETNAM CO., LTD");
+  const [selectedShipper, setSelectedShipper] = useState<string>("ALL");
 
   // Keep track of custom Warehouse charges edited by user.
   // Defaults will be parsed dynamically from the HAWB key numbers if not present.
@@ -60,9 +60,7 @@ export default function App() {
     setExchangeRate(26160);
     setWarehouseCharges({});
     setOtherCharges({});
-    if (selectedShipper !== "ALL" && !INITIAL_MANIFEST_DATA.some(m => m.shipper === selectedShipper)) {
-      setSelectedShipper(INITIAL_MANIFEST_DATA[0].shipper);
-    }
+    setSelectedShipper("ALL");
   };
 
   // --- Dynamic calculations mapping and logic ---
@@ -223,11 +221,7 @@ export default function App() {
       setWarehouseCharges({});
       setOtherCharges({});
 
-      if (newRows.length > 0) {
-        // Auto-select first shipper of the new dataset
-        const firstShipper = newRows[0].shipper || "DYM VIETNAM CO., LTD";
-        setSelectedShipper(firstShipper);
-      }
+      setSelectedShipper("ALL");
     } else {
       setManifests((prev) => [...prev, ...newRows]);
       
@@ -241,11 +235,7 @@ export default function App() {
         return merged;
       });
 
-      if (newRows.length > 0) {
-        // Auto-select the first shipper of the newly appended dataset
-        const firstNewShipper = newRows[0].shipper || "DYM VIETNAM CO., LTD";
-        setSelectedShipper(firstNewShipper);
-      }
+      setSelectedShipper("ALL");
     }
   };
 
