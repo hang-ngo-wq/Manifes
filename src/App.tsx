@@ -25,6 +25,7 @@ import { INITIAL_MANIFEST_DATA, DEMO_UNIT_PRICES } from "./data/demoData";
 import { exportShipperExcelReport } from "./utils/excelExporter";
 import DatabaseDesign from "./components/DatabaseDesign";
 import PythonScriptView from "./components/PythonScriptView";
+import ManifestUploader from "./components/ManifestUploader";
 
 export default function App() {
   // --- Active Tab State ---
@@ -202,6 +203,47 @@ export default function App() {
   // Remove a manifest row
   const handleDeleteRow = (id: string) => {
     setManifests((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  // Import handler for Drag & Drop files (Excel, CSV, TXT)
+  const handleDataImported = (newRows: ManifestRow[], overwrite: boolean) => {
+    if (overwrite) {
+      setManifests(newRows);
+      
+      const newUnitPrices: Record<string, number> = {};
+      newRows.forEach((row) => {
+        newUnitPrices[row.id] = 3.20;
+      });
+      setUnitPrices(newUnitPrices);
+
+      // Reset dynamic warehouse charges & other charges to restart fresh
+      setWarehouseCharges({});
+      setOtherCharges({});
+
+      if (newRows.length > 0) {
+        // Auto-select first shipper of the new dataset
+        const firstShipper = newRows[0].shipper || "DYM VIETNAM CO., LTD";
+        setSelectedShipper(firstShipper);
+      }
+    } else {
+      setManifests((prev) => [...prev, ...newRows]);
+      
+      setUnitPrices((prev) => {
+        const merged = { ...prev };
+        newRows.forEach((row) => {
+          if (merged[row.id] === undefined) {
+            merged[row.id] = 3.20;
+          }
+        });
+        return merged;
+      });
+
+      if (newRows.length > 0) {
+        // Auto-select the first shipper of the newly appended dataset
+        const firstNewShipper = newRows[0].shipper || "DYM VIETNAM CO., LTD";
+        setSelectedShipper(firstNewShipper);
+      }
+    }
   };
 
   // Update dynamic values (Unit Price, Warehouse charge, and other charge) on-the-fly
@@ -408,6 +450,11 @@ export default function App() {
               
               {/* PANEL LEFT (MÔ PHỎNG HÌNH 1): KHO TÀI LIỆU LOGISTICS MANIFEST CHỦ */}
               <div className="lg:col-span-5 space-y-4">
+                <ManifestUploader
+                  onImport={handleDataImported}
+                  shipperOptions={uniqueShippers}
+                />
+
                 <div className="bg-[#0b101d] rounded-2xl border border-slate-850 shadow-xl overflow-hidden">
                   <div className="p-4 bg-slate-900/60 border-b border-slate-850 flex justify-between items-center">
                     <div className="flex items-center gap-2">
