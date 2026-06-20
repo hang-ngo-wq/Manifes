@@ -112,15 +112,40 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
   // Helper: Try parsing cells safely
   const parseCellText = (cellVal: any): string => {
     if (cellVal === null || cellVal === undefined) return "";
+    let valStr = "";
     if (typeof cellVal === "object") {
-       if ("result" in cellVal) return String(cellVal.result || "");
-       if ("text" in cellVal) return String(cellVal.text || "");
-       if ("richText" in cellVal && Array.isArray(cellVal.richText)) {
-         return cellVal.richText.map((rt: any) => rt.text || "").join("");
+       if ("result" in cellVal) {
+         valStr = String(cellVal.result || "");
+       } else if ("text" in cellVal) {
+         valStr = String(cellVal.text || "");
+       } else if ("richText" in cellVal && Array.isArray(cellVal.richText)) {
+         valStr = cellVal.richText.map((rt: any) => rt.text || "").join("");
+       } else if ("value" in cellVal) {
+         valStr = String(cellVal.value || "");
+       } else {
+         valStr = JSON.stringify(cellVal);
        }
-       return JSON.stringify(cellVal);
+    } else {
+       valStr = String(cellVal).trim();
     }
-    return String(cellVal).trim();
+
+    // Convert scientific notation like 8.00003E+11 to plain digits
+    if (/^[+-]?[0-9.]+[eE][+-]?[0-9]+/i.test(valStr)) {
+      const num = Number(valStr);
+      if (!isNaN(num)) {
+        if (Number.isSafeInteger(num)) {
+          return String(num);
+        } else {
+          try {
+            return num.toLocaleString('fullwide', { useGrouping: false, maximumFractionDigits: 5 });
+          } catch (e) {
+            return String(num);
+          }
+        }
+      }
+    }
+
+    return valStr;
   };
 
   const parseCellNumber = (cellVal: any, fallbackValue: number): number => {
@@ -197,8 +222,21 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
           tempMapping.mawbNoIdx = idx;
           matches++;
         } else if (keywords.hawb.some(k => valStr === k || valStr.includes(k))) {
-          tempMapping.hawbIdx = idx;
-          matches++;
+          if (tempMapping.hawbIdx === -1) {
+            tempMapping.hawbIdx = idx;
+            matches++;
+          } else {
+            const oldValStr = tempMapping.hawbIdx >= 0 && tempMapping.hawbIdx < row.values.length
+              ? parseCellText(row.values[tempMapping.hawbIdx]).toLowerCase() : "";
+            // If the already-mapped column was exactly "awb" (column G) and current is "hawb" (column O), keep G "AWB" for tracking number
+            if (oldValStr === "awb" && valStr === "hawb") {
+              if (tempMapping.markHawbIdx === -1) {
+                tempMapping.markHawbIdx = idx;
+              }
+            } else {
+              tempMapping.hawbIdx = idx;
+            }
+          }
         } else if (keywords.shipper.some(k => valStr === k || valStr.includes(k))) {
           tempMapping.shipperIdx = idx;
           matches++;
@@ -285,38 +323,92 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
             const buffer = e.target?.result as ArrayBuffer;
             const workbook = new ExcelJS.Workbook();
             await workbook.xlsx.load(buffer);
-            const sheet = workbook.worksheets[0];
-            
-            if (!sheet) {
+             if (workbook.worksheets.length === 0) {
               throw new Error("Tệp tin Excel không chứa Worksheet nào.");
             }
 
-            const tempParsedList: ParsedRow[] = [];
-            sheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
-              const rowValues: any[] = [];
-              const lastCellCol = Math.max(sheet.columnCount, 15); // scan up to column limit
-              
-              for (let c = 1; c <= lastCellCol; c++) {
-                rowValues.push(row.getCell(c).value);
-              }
-              
-              if (rowValues.some(v => v !== null && v !== undefined && v !== "")) {
-                tempParsedList.push({
-                  rowNumber: rowNum,
-                  values: rowValues
-                });
-              }
-            });
+            // Auto-detect the best worksheet based on a structural and naming score
+            let bestSheet = workbook.worksheets[0];
+            let bestParsedList: ParsedRow[] = [];
+            let bestHeaders: string[] = [];
+            let bestMapping: HeaderMapping = {
+              mawbNoIdx: -1,
+              hawbIdx: -1,
+              shipperIdx: -1,
+              consigneeIdx: -1,
+              wtIdx: -1,
+              rwtIdx: -1,
+              vwIdx: -1,
+              etdIdx: -1,
+              etaIdx: -1,
+              billIdx: -1,
+              markHawbIdx: -1,
+              dateIdx: -1,
+            };
+            let bestHeaderRowIdx = -1;
+            let highestScore = -1;
 
-            if (tempParsedList.length === 0) {
-              throw new Error("Không tìm thấy dữ liệu dòng nào trong tệp tin Excel.");
+            for (const s of workbook.worksheets) {
+              const tempParsedList: ParsedRow[] = [];
+              s.eachRow({ includeEmpty: false }, (row, rowNum) => {
+                const rowValues: any[] = [];
+                const lastCellCol = Math.max(s.columnCount, 15); // scan up to column limit
+                
+                for (let c = 1; c <= lastCellCol; c++) {
+                  rowValues.push(row.getCell(c).value);
+                }
+                
+                if (rowValues.some(v => v !== null && v !== undefined && v !== "")) {
+                  tempParsedList.push({
+                    rowNumber: rowNum,
+                    values: rowValues
+                  });
+                }
+              });
+
+              if (tempParsedList.length > 0) {
+                const result = autoDetectHeaders(tempParsedList);
+                let score = 0;
+                if (result.detectedMapping.mawbNoIdx !== -1) score += 15;
+                if (result.detectedMapping.hawbIdx !== -1) score += 15;
+                if (result.detectedMapping.shipperIdx !== -1) score += 5;
+                if (result.detectedMapping.consigneeIdx !== -1) score += 5;
+                if (result.detectedMapping.wtIdx !== -1) score += 5;
+                if (result.detectedMapping.rwtIdx !== -1) score += 5;
+                
+                // Add minor point for row count
+                score += tempParsedList.length / 500;
+
+                // Prefer sheet name containing data-like words
+                const sheetNameLower = s.name.toLowerCase();
+                if (
+                  sheetNameLower.includes("data") || 
+                  sheetNameLower.includes("manifest") || 
+                  sheetNameLower.includes("vận đơn") || 
+                  sheetNameLower.includes("tổng hợp")
+                ) {
+                  score += 25;
+                }
+
+                if (score > highestScore) {
+                  highestScore = score;
+                  bestSheet = s;
+                  bestParsedList = tempParsedList;
+                  bestHeaders = result.headers;
+                  bestMapping = result.detectedMapping;
+                  bestHeaderRowIdx = result.headerIndex;
+                }
+              }
             }
 
-            const result = autoDetectHeaders(tempParsedList);
-            setParsedRows(tempParsedList);
-            setColumnNames(result.headers);
-            setMapping(result.detectedMapping);
-            setHeaderRowIdx(result.headerIndex);
+            if (bestParsedList.length === 0) {
+              throw new Error("Không tìm thấy dữ liệu dòng nào trong tất cả các Worksheet của tệp Excel.");
+            }
+
+            setParsedRows(bestParsedList);
+            setColumnNames(bestHeaders);
+            setMapping(bestMapping);
+            setHeaderRowIdx(bestHeaderRowIdx);
             setShowConfig(true);
           } catch (err: any) {
             setErrorMsg(`Lỗi đọc tệp Excel: ${err.message || err}`);
