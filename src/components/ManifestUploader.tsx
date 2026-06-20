@@ -57,6 +57,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
   const [fileSizeStr, setFileSizeStr] = useState<string>("");
   const [fileType, setFileType] = useState<"excel" | "csv" | "txt" | null>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const [headerRowIdx, setHeaderRowIdx] = useState<number>(-1);
 
   // Column mapping states
   const [mapping, setMapping] = useState<HeaderMapping>({
@@ -315,6 +316,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
             setParsedRows(tempParsedList);
             setColumnNames(result.headers);
             setMapping(result.detectedMapping);
+            setHeaderRowIdx(result.headerIndex);
             setShowConfig(true);
           } catch (err: any) {
             setErrorMsg(`Lỗi đọc tệp Excel: ${err.message || err}`);
@@ -382,6 +384,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
             setParsedRows(tempParsedList);
             setColumnNames(result.headers);
             setMapping(result.detectedMapping);
+            setHeaderRowIdx(result.headerIndex);
             setShowConfig(true);
           } catch (err: any) {
             setErrorMsg(`Lỗi đọc tệp văn bản: ${err.message || err}`);
@@ -442,6 +445,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     setFileType(null);
     setShowConfig(false);
     setErrorMsg(null);
+    setHeaderRowIdx(-1);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -449,13 +453,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
   const mappedManifestItems = useMemo<ManifestRow[]>(() => {
     if (parsedRows.length === 0) return [];
 
-    // Find first data row (usually row following the headers, or from start if no header mapped)
-    const headerRowIndex = parsedRows.findIndex((r, idx) => {
-      // Find if this is the header row
-      return idx < 12 && r.values.every((v, i) => parseCellText(v) === columnNames[i]);
-    });
-
-    const startDataRowIdx = headerRowIndex !== -1 ? headerRowIndex + 1 : 0;
+    const startDataRowIdx = headerRowIdx !== -1 ? headerRowIdx + 1 : 0;
     const finalItems: ManifestRow[] = [];
 
     for (let rIdx = startDataRowIdx; rIdx < parsedRows.length; rIdx++) {
@@ -468,9 +466,23 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
       const hawb = mapping.hawbIdx >= 0 && mapping.hawbIdx < vals.length
         ? parseCellText(vals[mapping.hawbIdx])
         : "";
+      const bill = mapping.billIdx !== undefined && mapping.billIdx >= 0 && mapping.billIdx < vals.length
+        ? parseCellText(vals[mapping.billIdx])
+        : "";
 
-      // Skip lines where MAWB or HAWB is extremely blank
-      if (!mawb && !hawb) continue;
+      // If the cell contains the header text itself or variations, skip it
+      if (
+        mawb.toLowerCase() === "mawb" || 
+        mawb.toLowerCase() === "mawb no" ||
+        hawb.toLowerCase() === "hawb" || 
+        hawb.toLowerCase() === "hawb no" ||
+        bill.toLowerCase() === "bill"
+      ) {
+        continue;
+      }
+
+      // Skip lines where MAWB, HAWB, and BILL are all extremely blank (such as completely empty rows or non-data lines)
+      if (!mawb && !hawb && !bill) continue;
 
       const shipper = mapping.shipperIdx >= 0 && mapping.shipperIdx < vals.length && parseCellText(vals[mapping.shipperIdx])
         ? parseCellText(vals[mapping.shipperIdx])
@@ -498,10 +510,6 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
 
       const eta = mapping.etaIdx !== undefined && mapping.etaIdx >= 0 && mapping.etaIdx < vals.length
         ? parseCellText(vals[mapping.etaIdx])
-        : "";
-
-      const bill = mapping.billIdx !== undefined && mapping.billIdx >= 0 && mapping.billIdx < vals.length
-        ? parseCellText(vals[mapping.billIdx])
         : "";
 
       const markHawb = mapping.markHawbIdx !== undefined && mapping.markHawbIdx >= 0 && mapping.markHawbIdx < vals.length
@@ -534,6 +542,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     parsedRows,
     mapping,
     columnNames,
+    headerRowIdx,
     defaultShipper,
     defaultConsignee,
     defaultWT,
