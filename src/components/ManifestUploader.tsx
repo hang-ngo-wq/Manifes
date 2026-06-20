@@ -166,11 +166,11 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
         } else if (keywords.consignee.some(k => valStr === k || valStr.includes(k))) {
           tempMapping.consigneeIdx = idx;
           matches++;
-        } else if (keywords.wt.some(k => valStr === k || valStr.includes(k))) {
-          tempMapping.wtIdx = idx;
-          matches++;
         } else if (keywords.rwt.some(k => valStr === k || valStr.includes(k))) {
           tempMapping.rwtIdx = idx;
+          matches++;
+        } else if (keywords.wt.some(k => valStr === k || valStr.includes(k))) {
+          tempMapping.wtIdx = idx;
           matches++;
         } else if (keywords.vw.some(k => valStr === k || valStr.includes(k))) {
           tempMapping.vwIdx = idx;
