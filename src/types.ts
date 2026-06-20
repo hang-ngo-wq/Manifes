@@ -13,6 +13,10 @@ export interface ManifestRow {
   rwt: number;    // Chargeable weight (R.W/T)
   vw: number;     // Volume weight (V.W)
   date?: string;   // Date of manifest
+  etd?: string;    // Estimated Time of Departure
+  eta?: string;    // Estimated Time of Arrival
+  bill?: string;   // Bill number
+  markHawb?: string; // Mark (HAWB)
 }
 
 export interface BillingCalculation {
@@ -29,6 +33,10 @@ export interface BillingCalculation {
   warehouseCharge: number; // Derived from HAWB reference numeric or manually edited
   otherCharge: number;     // Oth.Chg (editable, default 0)
   totalUsd: number;        // Freight + Handling + Warehouse + Other
+  etd?: string;
+  eta?: string;
+  bill?: string;
+  markHawb?: string;
 }
 
 export interface ShipperSummary {

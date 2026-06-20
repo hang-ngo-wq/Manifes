@@ -15,7 +15,11 @@ export const INITIAL_MANIFEST_DATA: ManifestRow[] = [
     wt: 165.5,
     rwt: 158.0,
     vw: 140.0,
-    date: "2026-06-15"
+    date: "2026-06-15",
+    etd: "15/06/2026",
+    eta: "16/06/2026",
+    bill: "800004204251",
+    markHawb: "HW-WH-45"
   },
   {
     id: "M002",
@@ -26,23 +30,38 @@ export const INITIAL_MANIFEST_DATA: ManifestRow[] = [
     wt: 85.0,
     rwt: 92.5,
     vw: 92.5,
-    date: "2026-06-15"
+    date: "2026-06-15",
+    etd: "15/06/2026",
+    eta: "16/06/2026",
+    bill: "800004204252",
+    markHawb: "HW-WH-25"
   },
   {
     id: "M004",
     mawbNo: "180-18407734 TCS",
     hawb: "HW-WH-12",
-    shipper: "DYM VIETNAM CO., LTD",
+    shipper: "GNG",
     consignee: "CJ LOGISTICS SEOUL",
-    wt: 12.4,
-    rwt: 15.0,
-    vw: 10.0,
-    date: "2026-06-16"
+    wt: 56.0,
+    rwt: 56.0,
+    vw: 50.0,
+    date: "2026-06-01",
+    etd: "01/06/2026",
+    eta: "2/6/2026",
+    bill: "800004204257",
+    markHawb: ""
   }
 ];
 
 export const DEMO_UNIT_PRICES: Record<string, number> = {
   "M001": 3.40,
   "M002": 3.40,
-  "M004": 4.10
+  "M004": 3.20
 };
+
+export const DEMO_WAREHOUSE_CHARGES: Record<string, number> = {
+  "M001": 45,
+  "M002": 25,
+  "M004": 2
+};
+

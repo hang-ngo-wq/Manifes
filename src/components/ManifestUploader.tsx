@@ -40,6 +40,10 @@ interface HeaderMapping {
   wtIdx: number;
   rwtIdx: number;
   vwIdx: number;
+  etdIdx?: number;
+  etaIdx?: number;
+  billIdx?: number;
+  markHawbIdx?: number;
 }
 
 export default function ManifestUploader({ onImport, shipperOptions }: ManifestUploaderProps) {
@@ -62,6 +66,10 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     wtIdx: -1,
     rwtIdx: -1,
     vwIdx: -1,
+    etdIdx: -1,
+    etaIdx: -1,
+    billIdx: -1,
+    markHawbIdx: -1,
   });
 
   // Default replacement values for missing fields during parse
@@ -82,6 +90,10 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     { key: "wtIdx", label: "Trọng Thô W/T (kg)", desc: "Trọng lượng vật lý thô thực tế", required: false },
     { key: "rwtIdx", label: "Tính Cước R.W/T (kg)", desc: "Trọng lượng dùng nhân đơn giá cước", required: false },
     { key: "vwIdx", label: "Thể Tích V.W (kg)", desc: "Trọng lượng quy đổi theo thể tích", required: false },
+    { key: "etdIdx", label: "ETD (Giờ đi)", desc: "Ngày và giờ khởi hành bay thực tế", required: false },
+    { key: "etaIdx", label: "ETA (Giờ đến)", desc: "Ngày và giờ hạ cánh thực tế tại ICN", required: false },
+    { key: "billIdx", label: "Invoice BILL No.", desc: "Mã hóa đơn/Biên nhận cước nội bộ", required: false },
+    { key: "markHawbIdx", label: "Kí hiệu Mark (HAWB)", desc: "Ghi chú/Kí hiệu nhận dạng phân lô hàng", required: false },
   ];
 
   // Helper to read and format file size
@@ -130,7 +142,11 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
       consignee: ["consignee", "nhận", "người nhận", "cnee", "consignee name"],
       wt: ["w/t", "wt", "weight", "gross", "trọng thô", "trọng lượng thực", "thực tế", "gross weight"],
       rwt: ["r.w/t", "rwt", "chargeable", "tính cước", "trọng lượng cước", "r.w.t", "chargeable weight"],
-      vw: ["v.w", "vw", "volume", "thể tích", "trọng lượng thể tích", "v.w.t", "volume weight"]
+      vw: ["v.w", "vw", "volume", "thể tích", "trọng lượng thể tích", "v.w.t", "volume weight"],
+      etd: ["etd", "departure", "khởi hành", "ngày đi", "etd_date"],
+      eta: ["eta", "arrival", "đến nhật", "ngày đến", "eta_date"],
+      bill: ["bill", "bill hố", "mã hóa đơn", "số bill", "bill no", "invoice"],
+      markHawb: ["mark", "mark (hawb)", "mark hawb", "ghi chú hawb", "kí hiệu", "hawb mark"]
     };
 
     let optimalMapping: HeaderMapping = {
@@ -140,7 +156,11 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
       consigneeIdx: -1,
       wtIdx: -1,
       rwtIdx: -1,
-      vwIdx: -1
+      vwIdx: -1,
+      etdIdx: -1,
+      etaIdx: -1,
+      billIdx: -1,
+      markHawbIdx: -1
     };
 
     // Scan up to first 12 rows to find headers
@@ -148,7 +168,19 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     for (let r = 0; r < scanRowsCount; r++) {
       const row = rows[r];
       let matches = 0;
-      let tempMapping = { mawbNoIdx: -1, hawbIdx: -1, shipperIdx: -1, consigneeIdx: -1, wtIdx: -1, rwtIdx: -1, vwIdx: -1 };
+      let tempMapping = {
+        mawbNoIdx: -1,
+        hawbIdx: -1,
+        shipperIdx: -1,
+        consigneeIdx: -1,
+        wtIdx: -1,
+        rwtIdx: -1,
+        vwIdx: -1,
+        etdIdx: -1,
+        etaIdx: -1,
+        billIdx: -1,
+        markHawbIdx: -1
+      };
 
       row.values.forEach((cell, idx) => {
         const valStr = parseCellText(cell).toLowerCase();
@@ -174,6 +206,18 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
           matches++;
         } else if (keywords.vw.some(k => valStr === k || valStr.includes(k))) {
           tempMapping.vwIdx = idx;
+          matches++;
+        } else if (keywords.etd.some(k => valStr === k || valStr.includes(k))) {
+          tempMapping.etdIdx = idx;
+          matches++;
+        } else if (keywords.eta.some(k => valStr === k || valStr.includes(k))) {
+          tempMapping.etaIdx = idx;
+          matches++;
+        } else if (keywords.bill.some(k => valStr === k || valStr.includes(k))) {
+          tempMapping.billIdx = idx;
+          matches++;
+        } else if (keywords.markHawb.some(k => valStr === k || valStr.includes(k))) {
+          tempMapping.markHawbIdx = idx;
           matches++;
         }
       });
@@ -439,6 +483,22 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
         ? parseCellNumber(vals[mapping.vwIdx], defaultVW)
         : defaultVW;
 
+      const etd = mapping.etdIdx !== undefined && mapping.etdIdx >= 0 && mapping.etdIdx < vals.length
+        ? parseCellText(vals[mapping.etdIdx])
+        : "";
+
+      const eta = mapping.etaIdx !== undefined && mapping.etaIdx >= 0 && mapping.etaIdx < vals.length
+        ? parseCellText(vals[mapping.etaIdx])
+        : "";
+
+      const bill = mapping.billIdx !== undefined && mapping.billIdx >= 0 && mapping.billIdx < vals.length
+        ? parseCellText(vals[mapping.billIdx])
+        : "";
+
+      const markHawb = mapping.markHawbIdx !== undefined && mapping.markHawbIdx >= 0 && mapping.markHawbIdx < vals.length
+        ? parseCellText(vals[mapping.markHawbIdx])
+        : "";
+
       finalItems.push({
         id: `M_IMP_${Date.now()}_${rIdx}`,
         mawbNo: mawb || `994-UNASSIGNED-${rIdx}`,
@@ -448,7 +508,11 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
         wt: Math.max(0, wt),
         rwt: Math.max(0, rwt),
         vw: Math.max(0, vw),
-        date: new Date().toISOString().split("T")[0]
+        date: new Date().toISOString().split("T")[0],
+        etd,
+        eta,
+        bill,
+        markHawb
       });
     }
 

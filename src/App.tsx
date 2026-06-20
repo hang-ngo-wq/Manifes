@@ -20,8 +20,8 @@ import {
   Calendar,
   DollarSign
 } from "lucide-react";
-import { ManifestRow, BillingCalculation, ShipperSummary } from "./types";
-import { INITIAL_MANIFEST_DATA, DEMO_UNIT_PRICES } from "./data/demoData";
+import { ManifestRow, BillingCalculation } from "./types";
+import { INITIAL_MANIFEST_DATA, DEMO_UNIT_PRICES, DEMO_WAREHOUSE_CHARGES } from "./data/demoData";
 import { exportShipperExcelReport } from "./utils/excelExporter";
 import DatabaseDesign from "./components/DatabaseDesign";
 import PythonScriptView from "./components/PythonScriptView";
@@ -41,38 +41,45 @@ export default function App() {
 
   // Derive unique list of shippers from current active manifests
   const uniqueShippers = useMemo(() => {
-    const set = new Set(manifests.map((m) => m.shipper));
-    return Array.from(set);
+    const shippersSet = new Set(manifests.map((m) => m.shipper));
+    return Array.from(shippersSet);
   }, [manifests]);
 
   // Selected Shipper for interactive detailed billing report (Hình 2 visualization)
   const [selectedShipper, setSelectedShipper] = useState<string>("ALL");
 
-  // Keep track of custom Warehouse charges edited by user.
-  // Defaults will be parsed dynamically from the HAWB key numbers if not present.
-  const [warehouseCharges, setWarehouseCharges] = useState<Record<string, number>>({});
+  // Keep track of custom inputs edited by user
+  const [warehouseCharges, setWarehouseCharges] = useState<Record<string, number>>(DEMO_WAREHOUSE_CHARGES);
   const [otherCharges, setOtherCharges] = useState<Record<string, number>>({});
+  const [etdValues, setEtdValues] = useState<Record<string, string>>({});
+  const [etaValues, setEtaValues] = useState<Record<string, string>>({});
+  const [billValues, setBillValues] = useState<Record<string, string>>({});
+  const [markHawbValues, setMarkHawbValues] = useState<Record<string, string>>({});
 
   // Reset to original demo dataset state
   const handleResetData = () => {
     setManifests(INITIAL_MANIFEST_DATA);
     setUnitPrices(DEMO_UNIT_PRICES);
     setExchangeRate(26160);
-    setWarehouseCharges({});
+    setWarehouseCharges(DEMO_WAREHOUSE_CHARGES);
     setOtherCharges({});
+    setEtdValues({});
+    setEtaValues({});
+    setBillValues({});
+    setMarkHawbValues({});
     setSelectedShipper("ALL");
   };
 
   // --- Dynamic calculations mapping and logic ---
   // Every time manifest data, unit price dict, or other charges changes,
-  // we rebuild the computed billing report in real-time. (No useEffect loops, pure reactivity!)
+  // we rebuild the computed billing report in real-time.
   const computedBillingRows: BillingCalculation[] = useMemo(() => {
     return manifests.map((m) => {
       // a. Core Route Rule: Chứa "HAN" -> SGN-HAN-ICN, Ngược lại -> SGN-ICN
       const isHan = m.mawbNo.toUpperCase().includes("HAN");
       const route = isHan ? "SGN-HAN-ICN" : "SGN-ICN";
 
-      // b. Weight Rule: Lấy chính xác giá trị R.W/T từ Hình 1
+      // b. Weight Rule: Lấy chính xác giá trị R.W/T từ Manifest
       const weight = m.rwt;
 
       // c. Handling Charge Rule: Cố định 10.00 USD cho tất cả các dòng
@@ -96,6 +103,12 @@ export default function App() {
       const freightCharge = weight * unitPrice;
       const totalUsd = freightCharge + handlingCharge + warehouseChargeInUSD + otherCharge;
 
+      // New fields from state or manifest defaults
+      const etd = etdValues[m.id] !== undefined ? etdValues[m.id] : (m.etd || m.date || "");
+      const eta = etaValues[m.id] !== undefined ? etaValues[m.id] : (m.eta || "");
+      const bill = billValues[m.id] !== undefined ? billValues[m.id] : (m.bill || "");
+      const markHawb = markHawbValues[m.id] !== undefined ? markHawbValues[m.id] : (m.markHawb || "");
+
       return {
         id: m.id,
         manifestId: m.id,
@@ -109,10 +122,14 @@ export default function App() {
         handlingCharge,
         warehouseCharge: warehouseChargeInUSD,
         otherCharge,
-        totalUsd
+        totalUsd,
+        etd,
+        eta,
+        bill,
+        markHawb
       };
     });
-  }, [manifests, unitPrices, warehouseCharges, otherCharges]);
+  }, [manifests, unitPrices, warehouseCharges, otherCharges, etdValues, etaValues, billValues, markHawbValues]);
 
   // Filter computed rows for the selected shipper (corresponds to active Hình 2 sheet)
   const shipperBillingRows = useMemo(() => {
@@ -262,6 +279,22 @@ export default function App() {
       ...prev,
       [id]: chg
     }));
+  };
+
+  const handleUpdateEtd = (id: string, val: string) => {
+    setEtdValues((prev) => ({ ...prev, [id]: val }));
+  };
+
+  const handleUpdateEta = (id: string, val: string) => {
+    setEtaValues((prev) => ({ ...prev, [id]: val }));
+  };
+
+  const handleUpdateBill = (id: string, val: string) => {
+    setBillValues((prev) => ({ ...prev, [id]: val }));
+  };
+
+  const handleUpdateMarkHawb = (id: string, val: string) => {
+    setMarkHawbValues((prev) => ({ ...prev, [id]: val }));
   };
 
   // Trigger spreadsheet file download
@@ -686,16 +719,19 @@ export default function App() {
                           <thead>
                             <tr className="bg-[#0b101c] text-emerald-400 font-semibold font-mono text-center border-b border-emerald-500/30">
                               <th className="py-2.5 px-1 border-r border-slate-850 w-8">NO.</th>
+                              <th className="py-2.5 px-1.5 border-r border-slate-850 w-20">ETD</th>
+                              <th className="py-2.5 px-1.5 border-r border-slate-850 w-20">ETA</th>
                               <th className="py-2.5 px-1.5 border-r border-slate-850">MAWB NO</th>
-                              <th className="py-2.5 px-1.5 border-r border-slate-850 w-16">HAWB</th>
-                              <th className="py-2.5 px-1.5 border-r border-slate-850 w-20">ROUTE</th>
-                              <th className="py-2.5 px-1.5 border-r border-slate-850 text-right">WEIGHT (kg)</th>
+                              <th className="py-2.5 px-1.5 border-r border-slate-850 w-24">BILL</th>
+                              <th className="py-2.5 px-1.5 border-r border-slate-850 w-16">ROUTE</th>
+                              <th className="py-2.5 px-1.5 border-r border-slate-850 text-right w-16">WEIGHT</th>
                               <th className="py-2.5 px-2 border-r border-slate-850 text-right w-24">UNIT PRICE ($)</th>
                               <th className="py-2.5 px-1.5 border-r border-slate-850 text-right">FREIGHT</th>
                               <th className="py-2.5 px-1.5 border-r border-slate-850 text-right w-16">HANDLING</th>
                               <th className="py-2.5 px-1.5 border-r border-slate-850 text-right w-18">WAREHOUSE</th>
                               <th className="py-2.5 px-1.5 border-r border-slate-850 text-right w-16">OTH.CHG</th>
-                              <th className="py-2.5 px-2 text-right font-bold text-emerald-300 bg-emerald-900/10">TOTAL (USD)</th>
+                              <th className="py-2.5 px-2 text-right font-bold text-emerald-300 bg-emerald-900/10 w-24">TOTAL (USD)</th>
+                              <th className="py-2.5 px-1.5 border-l border-slate-850 w-20">Mark (HAWB)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-850">
@@ -704,12 +740,42 @@ export default function App() {
                                 {/* NO */}
                                 <td className="py-2 px-1 text-center font-mono text-slate-500 border-r border-slate-850 bg-slate-950/20">{i + 1}</td>
                                 
+                                {/* ETD */}
+                                <td className="py-1 px-1 border-r border-slate-850">
+                                  <input
+                                    type="text"
+                                    className="w-full text-center bg-slate-950/20 hover:bg-[#0b101d] border border-slate-800 focus:border-emerald-500 rounded font-mono text-[10px] p-1 text-slate-300"
+                                    value={row.etd}
+                                    onChange={(e) => handleUpdateEtd(row.id, e.target.value)}
+                                    placeholder="ETD"
+                                  />
+                                </td>
+
+                                {/* ETA */}
+                                <td className="py-1 px-1 border-r border-slate-850">
+                                  <input
+                                    type="text"
+                                    className="w-full text-center bg-slate-950/20 hover:bg-[#0b101d] border border-slate-800 focus:border-emerald-500 rounded font-mono text-[10px] p-1 text-slate-300"
+                                    value={row.eta}
+                                    onChange={(e) => handleUpdateEta(row.id, e.target.value)}
+                                    placeholder="ETA"
+                                  />
+                                </td>
+
                                 {/* MAWB */}
                                 <td className="py-2 px-1.5 border-r border-slate-850 font-mono text-slate-300">{row.mawbNo}</td>
                                 
-                                {/* HAWB */}
-                                <td className="py-2 px-1.5 border-r border-slate-850 font-mono text-slate-100 font-semibold">{row.hawb}</td>
-                                
+                                {/* BILL */}
+                                <td className="py-1 px-1 border-r border-slate-850">
+                                  <input
+                                    type="text"
+                                    className="w-full text-center bg-slate-950/20 hover:bg-[#0b101d] border border-slate-800 focus:border-emerald-500 rounded font-mono text-[10px] p-1 text-slate-300 font-semibold"
+                                    value={row.bill}
+                                    onChange={(e) => handleUpdateBill(row.id, e.target.value)}
+                                    placeholder="Bill No."
+                                  />
+                                </td>
+
                                 {/* ROUTE */}
                                 <td className="py-2 px-1.5 border-r border-slate-850 text-center">
                                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
@@ -732,7 +798,7 @@ export default function App() {
                                     <input
                                       type="number"
                                       step="0.01"
-                                      className="w-full text-right bg-amber-500/10 border border-amber-500/20 rounded font-mono font-bold text-xs p-1 text-amber-350 focus:bg-[#070b13] focus:outline-hidden focus:border-amber-400 transition-all focus:ring-1 focus:ring-amber-950"
+                                      className="w-full text-right bg-amber-500/10 border border-amber-500/20 rounded font-mono font-bold text-xs p-1 text-amber-300 focus:bg-[#070b13] focus:outline-hidden focus:border-amber-400 transition-all focus:ring-1 focus:ring-amber-955"
                                       value={row.unitPrice}
                                       onChange={(e) => handleUpdateUnitPrice(row.id, e.target.value)}
                                     />
@@ -779,15 +845,26 @@ export default function App() {
                                 </td>
 
                                 {/* ROW TOTAL TO MÀU VÀNG (Yellow Highlight *) */}
-                                <td className="py-2 px-2.5 text-right font-mono font-bold text-amber-300 bg-amber-500/10">
+                                <td className="py-2 px-2.5 text-right font-mono font-bold text-amber-350 bg-amber-500/10">
                                   ${row.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </td>
+
+                                {/* Mark (HAWB) */}
+                                <td className="py-1 px-1 border-l border-slate-850">
+                                  <input
+                                    type="text"
+                                    className="w-full text-center bg-slate-950/20 hover:bg-[#0b101d] border border-slate-800 focus:border-emerald-500 rounded font-mono text-[10px] p-1 text-slate-300"
+                                    value={row.markHawb}
+                                    onChange={(e) => handleUpdateMarkHawb(row.id, e.target.value)}
+                                    placeholder="Mark (HAWB)"
+                                  />
                                 </td>
                               </tr>
                             ))}
 
                             {/* TOTAL SUMMATION FOOTER ROW (Màu mint viền đậm *) */}
                             <tr className="bg-[#0b101c] text-emerald-400 font-bold border-t-2 border-b-2 border-emerald-500/30">
-                              <td colSpan={4} className="py-3 px-2 text-center border-r border-slate-850 uppercase tracking-widest text-[9px] font-mono">
+                              <td colSpan={6} className="py-3 px-2 text-center border-r border-slate-850 uppercase tracking-widest text-[9px] font-mono">
                                 TOTAL / TỔNG CỘNG
                               </td>
                               
@@ -823,6 +900,9 @@ export default function App() {
                               <td className="py-3 px-2.5 text-right font-mono text-emerald-300 bg-emerald-500/10 font-black text-[11px]">
                                 ${selectedShipperTotals.totalUSD.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
+
+                              {/* Mark Column Footer cell */}
+                              <td className="py-3 px-1.5 text-center font-mono text-slate-500 border-l border-slate-850">-</td>
                             </tr>
                           </tbody>
                         </table>
