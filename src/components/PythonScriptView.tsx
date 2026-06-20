@@ -40,8 +40,9 @@ def process_manifest(input_path_or_df):
         # Lấy thông tin MAWB NO
         mawb_no = str(row.get('MAWB NO', '')).strip()
         
-        # a. QUY TẮC PHÂN TÍCH ROUTE: Chứa 'HAN' -> 'SGN-HAN-ICN', ngược lại -> 'SGN-ICN'
-        if 'HAN' in mawb_no.upper():
+        # a. QUY TẮC PHÂN TÍCH ROUTE: Chứa 'HAN' -> 'SGN-HAN-ICN', ngược lại -> 'SGN-ICN'. Nếu MAWB không chứa chữ thì mặc định 'SGN-ICN'.
+        has_letters = any(c.isalpha() for c in mawb_no)
+        if has_letters and 'HAN' in mawb_no.upper():
             route = "SGN-HAN-ICN"
         else:
             route = "SGN-ICN"

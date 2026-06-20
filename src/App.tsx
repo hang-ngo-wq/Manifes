@@ -75,8 +75,9 @@ export default function App() {
   // we rebuild the computed billing report in real-time.
   const computedBillingRows: BillingCalculation[] = useMemo(() => {
     return manifests.map((m) => {
-      // a. Core Route Rule: Chứa "HAN" -> SGN-HAN-ICN, Ngược lại -> SGN-ICN
-      const isHan = m.mawbNo.toUpperCase().includes("HAN");
+      // a. Core Route Rule: Chứa "HAN" -> SGN-HAN-ICN, Ngược lại -> SGN-ICN. Nếu MAWB không chứa chữ (chỉ số/kí tự đặc biệt), mặc định là SGN-ICN.
+      const hasLetters = /[a-zA-Z]/.test(m.mawbNo);
+      const isHan = hasLetters && m.mawbNo.toUpperCase().includes("HAN");
       const route = isHan ? "SGN-HAN-ICN" : "SGN-ICN";
 
       // b. Weight Rule: Lấy chính xác giá trị R.W/T từ Manifest
@@ -126,7 +127,8 @@ export default function App() {
         etd,
         eta,
         bill,
-        markHawb
+        markHawb,
+        date: m.date
       };
     });
   }, [manifests, unitPrices, warehouseCharges, otherCharges, etdValues, etaValues, billValues, markHawbValues]);

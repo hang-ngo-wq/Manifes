@@ -132,10 +132,10 @@ export async function exportShipperExcelReport(
 
     // Formatting cell values
     worksheetRow.getCell(1).value = i + 1; // NO
-    worksheetRow.getCell(2).value = row.etd || ""; // ETD
+    worksheetRow.getCell(2).value = row.etd || row.date || ""; // ETD
     worksheetRow.getCell(3).value = row.eta || ""; // ETA
     worksheetRow.getCell(4).value = row.mawbNo; // MAWB
-    worksheetRow.getCell(5).value = row.bill || ""; // BILL
+    worksheetRow.getCell(5).value = row.bill || row.hawb || ""; // BILL
     worksheetRow.getCell(6).value = row.route; // ROUTE
     worksheetRow.getCell(7).value = row.weight; // WEIGHT
     worksheetRow.getCell(8).value = row.unitPrice; // Unit Price

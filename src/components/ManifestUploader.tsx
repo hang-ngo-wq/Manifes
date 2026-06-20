@@ -44,6 +44,7 @@ interface HeaderMapping {
   etaIdx?: number;
   billIdx?: number;
   markHawbIdx?: number;
+  dateIdx?: number;
 }
 
 export default function ManifestUploader({ onImport, shipperOptions }: ManifestUploaderProps) {
@@ -70,6 +71,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     etaIdx: -1,
     billIdx: -1,
     markHawbIdx: -1,
+    dateIdx: -1,
   });
 
   // Default replacement values for missing fields during parse
@@ -94,6 +96,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     { key: "etaIdx", label: "ETA (Giờ đến)", desc: "Ngày và giờ hạ cánh thực tế tại ICN", required: false },
     { key: "billIdx", label: "Invoice BILL No.", desc: "Mã hóa đơn/Biên nhận cước nội bộ", required: false },
     { key: "markHawbIdx", label: "Kí hiệu Mark (HAWB)", desc: "Ghi chú/Kí hiệu nhận dạng phân lô hàng", required: false },
+    { key: "dateIdx", label: "Ngày tạo (Date)", desc: "Ngày tạo của Manifest (Thường lấy để gán cho ETD ròng)", required: false },
   ];
 
   // Helper to read and format file size
@@ -137,7 +140,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
     
     const keywords = {
       mawbNo: ["mawb", "master bill", "mã mawb", "vận đơn chính", "mawb no", "mawb_no"],
-      hawb: ["hawb", "house bill", "mã hawb", "vận đơn phụ", "hawb no", "hawb_no"],
+      hawb: ["hawb", "house bill", "mã hawb", "vận đơn phụ", "hawb no", "hawb_no", "awb"],
       shipper: ["shipper", "gửi", "người gửi", "company", "khách hàng", "shipper name"],
       consignee: ["consignee", "nhận", "người nhận", "cnee", "consignee name"],
       wt: ["w/t", "wt", "weight", "gross", "trọng thô", "trọng lượng thực", "thực tế", "gross weight"],
@@ -146,7 +149,8 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
       etd: ["etd", "departure", "khởi hành", "ngày đi", "etd_date"],
       eta: ["eta", "arrival", "đến nhật", "ngày đến", "eta_date"],
       bill: ["bill", "bill hố", "mã hóa đơn", "số bill", "bill no", "invoice"],
-      markHawb: ["mark", "mark (hawb)", "mark hawb", "ghi chú hawb", "kí hiệu", "hawb mark"]
+      markHawb: ["mark", "mark (hawb)", "mark hawb", "ghi chú hawb", "kí hiệu", "hawb mark"],
+      date: ["date", "ngày", "ngay", "ngày tạo", "ngày bay", "ngay bay", "ngay tao", "manifest date"]
     };
 
     let optimalMapping: HeaderMapping = {
@@ -160,7 +164,8 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
       etdIdx: -1,
       etaIdx: -1,
       billIdx: -1,
-      markHawbIdx: -1
+      markHawbIdx: -1,
+      dateIdx: -1
     };
 
     // Scan up to first 12 rows to find headers
@@ -179,7 +184,8 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
         etdIdx: -1,
         etaIdx: -1,
         billIdx: -1,
-        markHawbIdx: -1
+        markHawbIdx: -1,
+        dateIdx: -1
       };
 
       row.values.forEach((cell, idx) => {
@@ -218,6 +224,9 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
           matches++;
         } else if (keywords.markHawb.some(k => valStr === k || valStr.includes(k))) {
           tempMapping.markHawbIdx = idx;
+          matches++;
+        } else if (keywords.date.some(k => valStr === k || valStr.includes(k))) {
+          tempMapping.dateIdx = idx;
           matches++;
         }
       });
@@ -499,6 +508,10 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
         ? parseCellText(vals[mapping.markHawbIdx])
         : "";
 
+      const parsedDate = mapping.dateIdx !== undefined && mapping.dateIdx >= 0 && mapping.dateIdx < vals.length && parseCellText(vals[mapping.dateIdx])
+        ? parseCellText(vals[mapping.dateIdx])
+        : new Date().toISOString().split("T")[0];
+
       finalItems.push({
         id: `M_IMP_${Date.now()}_${rIdx}`,
         mawbNo: mawb || `994-UNASSIGNED-${rIdx}`,
@@ -508,7 +521,7 @@ export default function ManifestUploader({ onImport, shipperOptions }: ManifestU
         wt: Math.max(0, wt),
         rwt: Math.max(0, rwt),
         vw: Math.max(0, vw),
-        date: new Date().toISOString().split("T")[0],
+        date: parsedDate,
         etd,
         eta,
         bill,

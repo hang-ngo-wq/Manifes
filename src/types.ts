@@ -37,6 +37,7 @@ export interface BillingCalculation {
   eta?: string;
   bill?: string;
   markHawb?: string;
+  date?: string;
 }
 
 export interface ShipperSummary {
