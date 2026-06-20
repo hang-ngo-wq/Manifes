@@ -60,7 +60,7 @@ export default function App() {
     setExchangeRate(26160);
     setWarehouseCharges({});
     setOtherCharges({});
-    if (!INITIAL_MANIFEST_DATA.some(m => m.shipper === selectedShipper)) {
+    if (selectedShipper !== "ALL" && !INITIAL_MANIFEST_DATA.some(m => m.shipper === selectedShipper)) {
       setSelectedShipper(INITIAL_MANIFEST_DATA[0].shipper);
     }
   };
@@ -118,6 +118,9 @@ export default function App() {
 
   // Filter computed rows for the selected shipper (corresponds to active Hình 2 sheet)
   const shipperBillingRows = useMemo(() => {
+    if (selectedShipper === "ALL") {
+      return computedBillingRows;
+    }
     return computedBillingRows.filter(
       (row) => row.shipper.toUpperCase() === selectedShipper.toUpperCase()
     );
@@ -279,7 +282,7 @@ export default function App() {
     }
     try {
       await exportShipperExcelReport(
-        selectedShipper,
+        selectedShipper === "ALL" ? "TẤT CẢ KHÁCH HÀNG" : selectedShipper,
         shipperBillingRows,
         exchangeRate,
         reportMonth,
@@ -378,10 +381,13 @@ export default function App() {
                   <select
                     value={selectedShipper}
                     onChange={(e) => setSelectedShipper(e.target.value)}
-                    className="w-full text-xs font-semibold rounded-lg bg-[#070b13] border border-slate-800 p-2.5 outline-hidden focus:border-emerald-500 text-slate-200 transition-all cursor-pointer"
+                    className="w-full text-xs font-bold rounded-lg bg-[#070b13] border border-slate-800 p-2.5 outline-hidden focus:border-emerald-500 text-emerald-400 transition-all cursor-pointer"
                   >
+                    <option value="ALL" className="bg-[#0b101d] text-emerald-400 font-extrabold">
+                      ⭐ Hiện tất cả data (Tất cả Shippers)
+                    </option>
                     {uniqueShippers.map((sh) => (
-                      <option key={sh} value={sh} className="bg-[#0b101d] text-slate-200">
+                      <option key={sh} value={sh} className="bg-[#0b101d] text-slate-200 font-medium">
                         {sh}
                       </option>
                     ))}
@@ -594,7 +600,7 @@ export default function App() {
                       </thead>
                       <tbody className="divide-y divide-slate-850">
                         {manifests.map((m) => {
-                          const isSelectedShipper = m.shipper.toUpperCase() === selectedShipper.toUpperCase();
+                          const isSelectedShipper = selectedShipper !== "ALL" && m.shipper.toUpperCase() === selectedShipper.toUpperCase();
                           return (
                             <tr
                               key={m.id}
@@ -658,7 +664,7 @@ export default function App() {
                       <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Live Excel Ledger (Hình 2 Sheet)
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">
-                      Shipper: <strong className="text-emerald-300 font-semibold uppercase">{selectedShipper}</strong>
+                      Shipper: <strong className="text-emerald-300 font-semibold uppercase">{selectedShipper === "ALL" ? "Hiện tất cả" : selectedShipper}</strong>
                     </span>
                   </div>
 
@@ -669,7 +675,7 @@ export default function App() {
                       <h4 className="text-sm font-bold text-slate-100 leading-snug tracking-widest uppercase border-b border-slate-850 pb-2.5 font-mono">
                         BẢNG KÊ HÓA ĐƠN THÁNG {String(reportMonth).padStart(2, "0")} NĂM {reportYear}
                         <span className="block text-emerald-400 text-xs mt-1.5 font-extrabold font-mono tracking-wide">
-                          - [ SHIPPER: {selectedShipper.toUpperCase()} ] -
+                          - [ SHIPPER: {selectedShipper === "ALL" ? "TẤT CẢ KHÁCH HÀNG" : selectedShipper.toUpperCase()} ] -
                         </span>
                       </h4>
                       <p className="text-[10px] italic font-semibold text-cyan-400 mt-2 font-mono">
@@ -681,7 +687,7 @@ export default function App() {
                     {shipperBillingRows.length === 0 ? (
                       <div className="py-12 text-center text-slate-500 text-xs space-y-2">
                         <TrendingUp className="w-8 h-8 text-slate-600 mx-auto stroke-1" />
-                        <p>Không tìm thấy lô hàng nào trong kho ứng với Shipper <strong>{selectedShipper}</strong></p>
+                        <p>Không tìm thấy lô hàng nào trong kho ứng với Shipper <strong>{selectedShipper === "ALL" ? "Tất cả khách hàng" : selectedShipper}</strong></p>
                         <p className="text-[10px] text-slate-500">Hãy thêm vận đơn hoặc đổi tên Shipper gốc ở cột trái.</p>
                       </div>
                     ) : (
