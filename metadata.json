@@ -1,0 +1,6 @@
+{
+  "name": "Manifest & Billing System",
+  "description": "Hệ thống quản lý lưu trữ tài liệu manifest hàng không Logistics và tự động tính toán xuất bảng kê hóa đơn tính tiền cho từng Shipper.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
